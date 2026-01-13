@@ -40,9 +40,7 @@ body {
   cursor: pointer;
 }
 
-#examSection {
-  display: none;
-}
+#examSection { display: none; }
 
 #topBar {
   display: flex;
@@ -101,8 +99,9 @@ body {
   <h2>Online Exam Rules</h2>
   <ul style="text-align:left">
     <li>⏱ Duration: <b>30 minutes</b></li>
-    <li>🚫 Tab switching allowed only 4 times</li>
-    <li>📷 Camera access is mandatory</li>
+    <li>🚫 Max 4 tab switches</li>
+    <li>📷 Camera access mandatory</li>
+    <li>📸 Snapshot every 5 minutes + on tab switch</li>
   </ul>
 
   <h3>Candidate Details</h3>
@@ -140,29 +139,32 @@ body {
 
 <script>
 const EXAM_TIME = 30 * 60;
-const SNAPSHOT_INTERVAL = 60 * 1000;
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwEUPx5zZTyjVi444x-j1QqatakTTtMQ0ZASuFsCR-wSLQhDatbgQbjxeb3U4P3Gj1p/exec";
+const SNAPSHOT_INTERVAL = 5 * 60 * 1000; // ✅ 5 minutes
+const MAX_WARNINGS = 4;
+
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzvvGA8YdTj3Jt_cpzXbSIYL0qYpNifVDRvttBF4v0ZFODk-EBvCtkHsR6pE8GAHR8C/exec";
 
 let timeLeft = EXAM_TIME;
 let warnings = 0;
 let timerInterval;
+let snapshotInterval;
 
 function startExam() {
-  const nameInput = document.getElementById("candidateName");
-  const emailInput = document.getElementById("candidateEmail");
+  const name = candidateName.value.trim();
+  const email = candidateEmail.value.trim();
 
-  if (!nameInput.value.trim() || !emailInput.value.trim()) {
+  if (!name || !email) {
     alert("Please enter Name and Email");
     return;
   }
 
-  document.getElementById("rules").style.display = "none";
-  document.getElementById("examSection").style.display = "block";
-  document.getElementById("cameraBox").style.display = "block";
+  rules.style.display = "none";
+  examSection.style.display = "block";
+  cameraBox.style.display = "block";
 
+  logEvent("Exam Started");
   startTimer();
   startCamera();
-  logEvent("Exam Started");
 }
 
 /* TIMER */
@@ -170,47 +172,43 @@ function startTimer() {
   timerInterval = setInterval(() => {
     let m = Math.floor(timeLeft / 60);
     let s = timeLeft % 60;
-    document.getElementById("timer").innerText =
-      `${m}:${s < 10 ? "0" : ""}${s}`;
-
-    if (timeLeft-- <= 0) {
-      endExam("Time Completed");
-    }
+    timer.innerText = `${m}:${s < 10 ? "0" : ""}${s}`;
+    if (--timeLeft < 0) endExam("Time Completed");
   }, 1000);
 }
 
 /* CAMERA */
 function startCamera() {
-  navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+  navigator.mediaDevices.getUserMedia({ video: true })
     .then(stream => {
-      const video = document.getElementById("video");
       video.srcObject = stream;
 
-      setInterval(takeSnapshot, SNAPSHOT_INTERVAL);
+      snapshotInterval = setInterval(() => {
+        takeSnapshot("Auto Snapshot (5 min)");
+      }, SNAPSHOT_INTERVAL);
     })
-    .catch(err => {
-      alert("Camera permission is mandatory");
-      console.error(err);
-    });
+    .catch(() => alert("Camera permission is mandatory"));
 }
 
-function takeSnapshot() {
-  const video = document.getElementById("video");
+function takeSnapshot(reason) {
   if (!video.videoWidth) return;
 
   const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext("2d").drawImage(video, 0, 0);
-  logEvent("Snapshot", canvas.toDataURL("image/png"));
+
+  logEvent(reason, canvas.toDataURL("image/png"));
 }
 
-/* TAB SWITCH */
+/* TAB SWITCH SNAPSHOT + WARNING */
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     warnings++;
-    if (warnings <= 4) {
-      alert(`Warning ${warnings}/4: Tab switching is not allowed`);
+    takeSnapshot("Tab Switch Snapshot");
+
+    if (warnings <= MAX_WARNINGS) {
+      alert(`Warning ${warnings}/${MAX_WARNINGS}: Tab switching is not allowed`);
       logEvent(`Tab Switch Warning ${warnings}`);
     } else {
       endExam("Disqualified - Tab Switching");
@@ -221,11 +219,13 @@ document.addEventListener("visibilitychange", () => {
 /* END EXAM */
 function endExam(reason) {
   clearInterval(timerInterval);
+  clearInterval(snapshotInterval);
+
   logEvent(reason);
 
-  document.getElementById("examSection").style.display = "none";
-  document.getElementById("cameraBox").style.display = "none";
-  document.getElementById("thankYou").style.display = "block";
+  examSection.style.display = "none";
+  cameraBox.style.display = "none";
+  thankYou.style.display = "block";
 }
 
 /* LOGGING */
@@ -233,8 +233,8 @@ function logEvent(event, snapshot = "") {
   fetch(WEB_APP_URL, {
     method: "POST",
     body: JSON.stringify({
-      name: document.getElementById("candidateName").value,
-      email: document.getElementById("candidateEmail").value,
+      name: candidateName.value,
+      email: candidateEmail.value,
       event,
       snapshot
     })
@@ -243,17 +243,15 @@ function logEvent(event, snapshot = "") {
 
 /* DRAG CAMERA */
 let dragging = false, offsetX, offsetY;
-const cam = document.getElementById("cameraBox");
-
-cam.onmousedown = e => {
+cameraBox.onmousedown = e => {
   dragging = true;
   offsetX = e.offsetX;
   offsetY = e.offsetY;
 };
 document.onmousemove = e => {
   if (dragging) {
-    cam.style.left = e.pageX - offsetX + "px";
-    cam.style.top = e.pageY - offsetY + "px";
+    cameraBox.style.left = e.pageX - offsetX + "px";
+    cameraBox.style.top = e.pageY - offsetY + "px";
   }
 };
 document.onmouseup = () => dragging = false;
