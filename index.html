@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Online Proctored Test</title>
+
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  #examSection { display: none; }
+  video { border: 2px solid #000; margin-top: 10px; }
+  #timer { font-size: 20px; color: red; font-weight: bold; }
+</style>
+</head>
+
+<body>
+
+<!-- RULES -->
+<div id="rules">
+  <h2>Exam Rules</h2>
+  <ul>
+    <li>Total time: <b>30 minutes</b></li>
+    <li>No tab switching (2 warnings only)</li>
+    <li>Camera access is mandatory</li>
+    <li>Snapshots will be taken automatically</li>
+  </ul>
+
+  <h3>Candidate Details</h3>
+  <input type="text" id="name" placeholder="Full Name"><br><br>
+  <input type="email" id="email" placeholder="Email Address"><br><br>
+  <button onclick="startExam()">Start Exam</button>
+</div>
+
+<!-- EXAM -->
+<div id="examSection">
+  <p>⏳ Time Left: <span id="timer">30:00</span></p>
+
+  <iframe
+    src="https://docs.google.com/forms/d/e/1FAIpQLSdNv4oHB_SPeFu9BfOUX_UztzxbyvPKwQuWja78k4FDoL7rCQ/viewform?usp=header"
+    width="100%"
+    height="600"
+    frameborder="0">
+  </iframe>
+</div>
+
+<!-- CAMERA -->
+<video id="video" width="320" height="240" autoplay muted></video>
+
+<script>
+/* ================= CONFIG ================= */
+const EXAM_TIME = 30 * 60; // 30 minutes
+const SNAPSHOT_INTERVAL = 60 * 1000; // 1 minute
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxd4FSi9GI0qIowEYPxYVvc05_cw2ICvwNT7cyEpXsHCkgQ7EL1eSZ8xfLqgNQ8hQs4/exec";
+
+/* ================= VARIABLES ================= */
+let timeLeft = EXAM_TIME;
+let warnings = 0;
+let timerInterval;
+
+/* ================= FUNCTIONS ================= */
+
+function startExam() {
+  const name = document.getElementById("name").value;
+  const email = document.getElementById("email").value;
+
+  if (!name || !email) {
+    alert("Please enter Name and Email");
+    return;
+  }
+
+  document.getElementById("rules").style.display = "none";
+  document.getElementById("examSection").style.display = "block";
+
+  logEvent(name, email, "Exam Started");
+  startTimer();
+  startCamera(name, email);
+}
+
+/* TIMER */
+function startTimer() {
+  timerInterval = setInterval(() => {
+    let min = Math.floor(timeLeft / 60);
+    let sec = timeLeft % 60;
+    document.getElementById("timer").innerText =
+      `${min}:${sec < 10 ? "0" : ""}${sec}`;
+
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      endExam("Time Completed");
+    }
+    timeLeft--;
+  }, 1000);
+}
+
+/* CAMERA */
+function startCamera(name, email) {
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => {
+      const video = document.getElementById("video");
+      video.srcObject = stream;
+
+      setInterval(() => {
+        takeSnapshot(name, email);
+      }, SNAPSHOT_INTERVAL);
+    })
+    .catch(() => alert("Camera permission is required"));
+}
+
+function takeSnapshot(name, email) {
+  const video = document.getElementById("video");
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+  const image = canvas.toDataURL("image/png");
+
+  logEvent(name, email, "Snapshot Captured", image);
+}
+
+/* TAB SWITCH */
+window.onblur = () => {
+  warnings++;
+  const name = document.getElementById("name").value;
+  const email = document.getElementById("email").value;
+
+  if (warnings <= 2) {
+    alert(`Warning ${warnings}: Tab switching is not allowed`);
+    logEvent(name, email, `Tab Switch Warning ${warnings}`);
+  } else {
+    endExam("Disqualified - Tab Switching");
+  }
+};
+
+/* END EXAM */
+function endExam(reason) {
+  clearInterval(timerInterval);
+  alert("Exam Ended: " + reason);
+  logEvent(
+    document.getElementById("name").value,
+    document.getElementById("email").value,
+    reason
+  );
+  location.reload();
+}
+
+/* LOGGING */
+function logEvent(name, email, event, snapshot = "") {
+  fetch(WEB_APP_URL, {
+    method: "POST",
+    body: JSON.stringify({ name, email, event, snapshot })
+  });
+}
+</script>
+
+</body>
+</html>
