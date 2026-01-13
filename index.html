@@ -12,19 +12,14 @@ body {
   background: #f5f7fa;
 }
 
-/* RULES CARD */
 #rules {
-  max-width: 500px;
+  max-width: 520px;
   margin: 80px auto;
   background: #fff;
   padding: 30px;
   border-radius: 12px;
   box-shadow: 0 10px 25px rgba(0,0,0,0.1);
   text-align: center;
-}
-
-#rules h2 {
-  margin-bottom: 10px;
 }
 
 #rules input {
@@ -37,15 +32,14 @@ body {
 
 #rules button {
   padding: 12px 30px;
-  border: none;
-  border-radius: 6px;
   background: #2563eb;
   color: white;
+  border: none;
+  border-radius: 6px;
   font-size: 16px;
   cursor: pointer;
 }
 
-/* EXAM */
 #examSection {
   display: none;
 }
@@ -58,8 +52,8 @@ body {
 
 #timer {
   font-size: 20px;
-  font-weight: bold;
   color: red;
+  font-weight: bold;
 }
 
 #endBtn {
@@ -71,18 +65,20 @@ body {
   cursor: pointer;
 }
 
-/* CAMERA BOX */
+/* CAMERA */
 #cameraBox {
   position: fixed;
   top: 40%;
   right: 20px;
   width: 260px;
+  height: 200px;
   resize: both;
   overflow: hidden;
   border: 2px solid #000;
   background: #000;
   cursor: move;
   z-index: 9999;
+  display: none;
 }
 
 #cameraBox video {
@@ -90,11 +86,10 @@ body {
   height: 100%;
 }
 
-/* THANK YOU */
 #thankYou {
   display: none;
   text-align: center;
-  margin-top: 100px;
+  margin-top: 120px;
 }
 </style>
 </head>
@@ -111,8 +106,8 @@ body {
   </ul>
 
   <h3>Candidate Details</h3>
-  <input id="name" placeholder="Full Name">
-  <input id="email" placeholder="Email Address">
+  <input id="candidateName" placeholder="Full Name">
+  <input id="candidateEmail" placeholder="Email Address">
   <br><br>
   <button onclick="startExam()">Start Exam</button>
 </div>
@@ -134,7 +129,7 @@ body {
 
 <!-- CAMERA -->
 <div id="cameraBox">
-  <video id="video" autoplay muted></video>
+  <video id="video" autoplay muted playsinline></video>
 </div>
 
 <!-- THANK YOU -->
@@ -153,12 +148,18 @@ let warnings = 0;
 let timerInterval;
 
 function startExam() {
-  if (!name.value || !email.value) {
-    alert("Enter Name & Email");
+  const nameInput = document.getElementById("candidateName");
+  const emailInput = document.getElementById("candidateEmail");
+
+  if (!nameInput.value.trim() || !emailInput.value.trim()) {
+    alert("Please enter Name and Email");
     return;
   }
-  rules.style.display = "none";
-  examSection.style.display = "block";
+
+  document.getElementById("rules").style.display = "none";
+  document.getElementById("examSection").style.display = "block";
+  document.getElementById("cameraBox").style.display = "block";
+
   startTimer();
   startCamera();
   logEvent("Exam Started");
@@ -169,33 +170,47 @@ function startTimer() {
   timerInterval = setInterval(() => {
     let m = Math.floor(timeLeft / 60);
     let s = timeLeft % 60;
-    timer.innerText = `${m}:${s < 10 ? "0" : ""}${s}`;
-    if (timeLeft-- <= 0) endExam("Time Completed");
+    document.getElementById("timer").innerText =
+      `${m}:${s < 10 ? "0" : ""}${s}`;
+
+    if (timeLeft-- <= 0) {
+      endExam("Time Completed");
+    }
   }, 1000);
 }
 
 /* CAMERA */
 function startCamera() {
-  navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-    video.srcObject = stream;
-    setInterval(snapshot, SNAPSHOT_INTERVAL);
-  });
+  navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    .then(stream => {
+      const video = document.getElementById("video");
+      video.srcObject = stream;
+
+      setInterval(takeSnapshot, SNAPSHOT_INTERVAL);
+    })
+    .catch(err => {
+      alert("Camera permission is mandatory");
+      console.error(err);
+    });
 }
 
-function snapshot() {
-  const c = document.createElement("canvas");
-  c.width = video.videoWidth;
-  c.height = video.videoHeight;
-  c.getContext("2d").drawImage(video,0,0);
-  logEvent("Snapshot", c.toDataURL("image/png"));
+function takeSnapshot() {
+  const video = document.getElementById("video");
+  if (!video.videoWidth) return;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+  logEvent("Snapshot", canvas.toDataURL("image/png"));
 }
 
-/* TAB SWITCH (4 WARNINGS) */
+/* TAB SWITCH */
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     warnings++;
     if (warnings <= 4) {
-      alert(`Warning ${warnings}/4: Do not switch tabs`);
+      alert(`Warning ${warnings}/4: Tab switching is not allowed`);
       logEvent(`Tab Switch Warning ${warnings}`);
     } else {
       endExam("Disqualified - Tab Switching");
@@ -207,18 +222,19 @@ document.addEventListener("visibilitychange", () => {
 function endExam(reason) {
   clearInterval(timerInterval);
   logEvent(reason);
-  examSection.style.display = "none";
-  cameraBox.style.display = "none";
-  thankYou.style.display = "block";
+
+  document.getElementById("examSection").style.display = "none";
+  document.getElementById("cameraBox").style.display = "none";
+  document.getElementById("thankYou").style.display = "block";
 }
 
 /* LOGGING */
-function logEvent(event, snapshot="") {
+function logEvent(event, snapshot = "") {
   fetch(WEB_APP_URL, {
     method: "POST",
     body: JSON.stringify({
-      name: name.value,
-      email: email.value,
+      name: document.getElementById("candidateName").value,
+      email: document.getElementById("candidateEmail").value,
       event,
       snapshot
     })
@@ -226,15 +242,21 @@ function logEvent(event, snapshot="") {
 }
 
 /* DRAG CAMERA */
-let drag=false, x,y;
-cameraBox.onmousedown=e=>{drag=true;x=e.offsetX;y=e.offsetY;}
-document.onmousemove=e=>{
-  if(drag){
-    cameraBox.style.left=e.pageX-x+"px";
-    cameraBox.style.top=e.pageY-y+"px";
+let dragging = false, offsetX, offsetY;
+const cam = document.getElementById("cameraBox");
+
+cam.onmousedown = e => {
+  dragging = true;
+  offsetX = e.offsetX;
+  offsetY = e.offsetY;
+};
+document.onmousemove = e => {
+  if (dragging) {
+    cam.style.left = e.pageX - offsetX + "px";
+    cam.style.top = e.pageY - offsetY + "px";
   }
-}
-document.onmouseup=()=>drag=false;
+};
+document.onmouseup = () => dragging = false;
 </script>
 
 </body>
