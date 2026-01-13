@@ -5,10 +5,97 @@
 <title>Online Proctored Test</title>
 
 <style>
-  body { font-family: Arial, sans-serif; margin: 20px; }
-  #examSection { display: none; }
-  video { border: 2px solid #000; margin-top: 10px; }
-  #timer { font-size: 20px; color: red; font-weight: bold; }
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background: #f5f7fa;
+}
+
+/* RULES CARD */
+#rules {
+  max-width: 500px;
+  margin: 80px auto;
+  background: #fff;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+#rules h2 {
+  margin-bottom: 10px;
+}
+
+#rules input {
+  width: 90%;
+  padding: 12px;
+  margin: 8px 0;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+#rules button {
+  padding: 12px 30px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* EXAM */
+#examSection {
+  display: none;
+}
+
+#topBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#timer {
+  font-size: 20px;
+  font-weight: bold;
+  color: red;
+}
+
+#endBtn {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* CAMERA BOX */
+#cameraBox {
+  position: fixed;
+  top: 40%;
+  right: 20px;
+  width: 260px;
+  resize: both;
+  overflow: hidden;
+  border: 2px solid #000;
+  background: #000;
+  cursor: move;
+  z-index: 9999;
+}
+
+#cameraBox video {
+  width: 100%;
+  height: 100%;
+}
+
+/* THANK YOU */
+#thankYou {
+  display: none;
+  text-align: center;
+  margin-top: 100px;
+}
 </style>
 </head>
 
@@ -16,139 +103,138 @@
 
 <!-- RULES -->
 <div id="rules">
-  <h2>Exam Rules</h2>
-  <ul>
-    <li>Total time: <b>30 minutes</b></li>
-    <li>No tab switching (2 warnings only)</li>
-    <li>Camera access is mandatory</li>
-    <li>Snapshots will be taken automatically</li>
+  <h2>Online Exam Rules</h2>
+  <ul style="text-align:left">
+    <li>⏱ Duration: <b>30 minutes</b></li>
+    <li>🚫 Tab switching allowed only 4 times</li>
+    <li>📷 Camera access is mandatory</li>
   </ul>
 
   <h3>Candidate Details</h3>
-  <input type="text" id="name" placeholder="Full Name"><br><br>
-  <input type="email" id="email" placeholder="Email Address"><br><br>
+  <input id="name" placeholder="Full Name">
+  <input id="email" placeholder="Email Address">
+  <br><br>
   <button onclick="startExam()">Start Exam</button>
 </div>
 
 <!-- EXAM -->
 <div id="examSection">
-  <p>⏳ Time Left: <span id="timer">30:00</span></p>
+  <div id="topBar">
+    <div>⏳ Time Left: <span id="timer">30:00</span></div>
+    <button id="endBtn" onclick="endExam('Candidate Ended Exam')">End Exam</button>
+  </div>
 
   <iframe
-    src="https://docs.google.com/forms/d/e/1FAIpQLSdNv4oHB_SPeFu9BfOUX_UztzxbyvPKwQuWja78k4FDoL7rCQ/viewform?usp=header"
+    src="https://docs.google.com/forms/d/e/1FAIpQLSdNv4oHB_SPeFu9BfOUX_UztzxbyvPKwQuWja78k4FDoL7rCQ/viewform"
     width="100%"
-    height="600"
+    height="650"
     frameborder="0">
   </iframe>
 </div>
 
 <!-- CAMERA -->
-<video id="video" width="320" height="240" autoplay muted></video>
+<div id="cameraBox">
+  <video id="video" autoplay muted></video>
+</div>
+
+<!-- THANK YOU -->
+<div id="thankYou">
+  <h1>🙏 Thank You for Participating!</h1>
+  <p>Your test has been successfully completed.</p>
+</div>
 
 <script>
-/* ================= CONFIG ================= */
-const EXAM_TIME = 30 * 60; // 30 minutes
-const SNAPSHOT_INTERVAL = 60 * 1000; // 1 minute
+const EXAM_TIME = 30 * 60;
+const SNAPSHOT_INTERVAL = 60 * 1000;
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxd4FSi9GI0qIowEYPxYVvc05_cw2ICvwNT7cyEpXsHCkgQ7EL1eSZ8xfLqgNQ8hQs4/exec";
 
-/* ================= VARIABLES ================= */
 let timeLeft = EXAM_TIME;
 let warnings = 0;
 let timerInterval;
 
-/* ================= FUNCTIONS ================= */
-
 function startExam() {
-  const name = document.getElementById("name").value;
-  const email = document.getElementById("email").value;
-
-  if (!name || !email) {
-    alert("Please enter Name and Email");
+  if (!name.value || !email.value) {
+    alert("Enter Name & Email");
     return;
   }
-
-  document.getElementById("rules").style.display = "none";
-  document.getElementById("examSection").style.display = "block";
-
-  logEvent(name, email, "Exam Started");
+  rules.style.display = "none";
+  examSection.style.display = "block";
   startTimer();
-  startCamera(name, email);
+  startCamera();
+  logEvent("Exam Started");
 }
 
 /* TIMER */
 function startTimer() {
   timerInterval = setInterval(() => {
-    let min = Math.floor(timeLeft / 60);
-    let sec = timeLeft % 60;
-    document.getElementById("timer").innerText =
-      `${min}:${sec < 10 ? "0" : ""}${sec}`;
-
-    if (timeLeft <= 0) {
-      clearInterval(timerInterval);
-      endExam("Time Completed");
-    }
-    timeLeft--;
+    let m = Math.floor(timeLeft / 60);
+    let s = timeLeft % 60;
+    timer.innerText = `${m}:${s < 10 ? "0" : ""}${s}`;
+    if (timeLeft-- <= 0) endExam("Time Completed");
   }, 1000);
 }
 
 /* CAMERA */
-function startCamera(name, email) {
-  navigator.mediaDevices.getUserMedia({ video: true })
-    .then(stream => {
-      const video = document.getElementById("video");
-      video.srcObject = stream;
-
-      setInterval(() => {
-        takeSnapshot(name, email);
-      }, SNAPSHOT_INTERVAL);
-    })
-    .catch(() => alert("Camera permission is required"));
+function startCamera() {
+  navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+    video.srcObject = stream;
+    setInterval(snapshot, SNAPSHOT_INTERVAL);
+  });
 }
 
-function takeSnapshot(name, email) {
-  const video = document.getElementById("video");
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext("2d").drawImage(video, 0, 0);
-  const image = canvas.toDataURL("image/png");
-
-  logEvent(name, email, "Snapshot Captured", image);
+function snapshot() {
+  const c = document.createElement("canvas");
+  c.width = video.videoWidth;
+  c.height = video.videoHeight;
+  c.getContext("2d").drawImage(video,0,0);
+  logEvent("Snapshot", c.toDataURL("image/png"));
 }
 
-/* TAB SWITCH */
-window.onblur = () => {
-  warnings++;
-  const name = document.getElementById("name").value;
-  const email = document.getElementById("email").value;
-
-  if (warnings <= 2) {
-    alert(`Warning ${warnings}: Tab switching is not allowed`);
-    logEvent(name, email, `Tab Switch Warning ${warnings}`);
-  } else {
-    endExam("Disqualified - Tab Switching");
+/* TAB SWITCH (4 WARNINGS) */
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    warnings++;
+    if (warnings <= 4) {
+      alert(`Warning ${warnings}/4: Do not switch tabs`);
+      logEvent(`Tab Switch Warning ${warnings}`);
+    } else {
+      endExam("Disqualified - Tab Switching");
+    }
   }
-};
+});
 
 /* END EXAM */
 function endExam(reason) {
   clearInterval(timerInterval);
-  alert("Exam Ended: " + reason);
-  logEvent(
-    document.getElementById("name").value,
-    document.getElementById("email").value,
-    reason
-  );
-  location.reload();
+  logEvent(reason);
+  examSection.style.display = "none";
+  cameraBox.style.display = "none";
+  thankYou.style.display = "block";
 }
 
 /* LOGGING */
-function logEvent(name, email, event, snapshot = "") {
+function logEvent(event, snapshot="") {
   fetch(WEB_APP_URL, {
     method: "POST",
-    body: JSON.stringify({ name, email, event, snapshot })
+    body: JSON.stringify({
+      name: name.value,
+      email: email.value,
+      event,
+      snapshot
+    })
   });
 }
+
+/* DRAG CAMERA */
+let drag=false, x,y;
+cameraBox.onmousedown=e=>{drag=true;x=e.offsetX;y=e.offsetY;}
+document.onmousemove=e=>{
+  if(drag){
+    cameraBox.style.left=e.pageX-x+"px";
+    cameraBox.style.top=e.pageY-y+"px";
+  }
+}
+document.onmouseup=()=>drag=false;
 </script>
 
 </body>
