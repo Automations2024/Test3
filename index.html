@@ -139,15 +139,15 @@ body {
 
 <script>
 const EXAM_TIME = 30 * 60;
-const SNAPSHOT_INTERVAL = 5 * 60 * 1000; // ✅ 5 minutes
+const SNAPSHOT_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const MAX_WARNINGS = 4;
-
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxK4H4dIKOigoZ9QLh4cFH0lWs2l8Csl9Da1INezggr6EfD8wS8Kp5u7RtEwgii7GOf/exec";
 
 let timeLeft = EXAM_TIME;
 let warnings = 0;
 let timerInterval;
 let snapshotInterval;
+let cameraStream = null;
 
 function startExam() {
   const name = candidateName.value.trim();
@@ -181,6 +181,7 @@ function startTimer() {
 function startCamera() {
   navigator.mediaDevices.getUserMedia({ video: true })
     .then(stream => {
+      cameraStream = stream;
       video.srcObject = stream;
 
       snapshotInterval = setInterval(() => {
@@ -188,6 +189,14 @@ function startCamera() {
       }, SNAPSHOT_INTERVAL);
     })
     .catch(() => alert("Camera permission is mandatory"));
+}
+
+function stopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop());
+    video.srcObject = null;
+    cameraStream = null;
+  }
 }
 
 function takeSnapshot(reason) {
@@ -220,6 +229,8 @@ document.addEventListener("visibilitychange", () => {
 function endExam(reason) {
   clearInterval(timerInterval);
   clearInterval(snapshotInterval);
+
+  stopCamera(); // ✅ Disconnect camera
 
   logEvent(reason);
 
@@ -255,6 +266,11 @@ document.onmousemove = e => {
   }
 };
 document.onmouseup = () => dragging = false;
+
+/* STOP CAMERA ON TAB CLOSE/REFRESH */
+window.addEventListener("beforeunload", () => {
+  stopCamera();
+});
 </script>
 
 </body>
